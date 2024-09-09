@@ -1,0 +1,124 @@
+---
+title: "Untitled"
+author: "Vincent Oh"
+date: "2024-05-22"
+output: pdf_document
+---
+```{r}
+df <- read.csv('train_cleaned.csv')
+df$Sex[df$Sex == 'male'] <- 1
+df$Sex[df$Sex == 'female'] <- 0
+df$Embarked[df$Embarked == 'S'] <- 2
+df$Embarked[df$Embarked == 'C'] <- 1
+df$Embarked[df$Embarked == 'Q'] <- 0
+df <- df[,-1]
+
+set.seed(123)
+train_ratio <- 0.7
+train_indices <- sample(1:nrow(df), size = train_ratio * nrow(df))
+
+train <- df[train_indices, ]
+test <- df[-train_indices, ]
+
+head(train)
+head(test)
+```
+
+```{r}
+
+fit1 <- glm(Survived~Pclass + Sex + Age + SibSp + Parch + Fare + factor(Embarked) +
+           has_english_letter, family = binomial, data = train)
+summary(fit1)
+fit2 <- glm(Survived~Pclass + Sex + Age + SibSp, family = binomial, data = train)
+summary(fit2)
+#fit3 <- glm(Survived~Pclass + Sex + Age + SibSp + Pclass:Sex + Pclass:Age + Pclass:SibSp, 
+#            family = binomial, data = train)
+#summary(fit3)
+#fit4 <- glm(Survived~Pclass + Sex + Age + SibSp + Pclass:Sex + Pclass:Age + Pclass:SibSp +
+#            Sex:Age + Age:SibSp + Sex:SibSp, 
+#            family = binomial, data = train)
+#summary(fit4)
+fit5 <- glm(Survived~Pclass + Sex + Age + SibSp + Pclass:Sex , 
+            family = binomial, data = train)
+summary(fit5)
+fit6 <- glm(Survived~Pclass + Sex + Age + SibSp + Pclass:Age , 
+            family = binomial, data = train)
+summary(fit6)
+fit7 <- glm(Survived~Pclass + Sex + Age + SibSp + Pclass:SibSp , 
+            family = binomial, data = train)
+summary(fit7)
+fit8 <- glm(Survived~Pclass + Sex + Age + SibSp + Sex:Age , 
+            family = binomial, data = train)
+summary(fit8)
+
+fit9 <- glm(Survived~Pclass + Sex + Age + SibSp + Age:SibSp, 
+            family = binomial, data = train)
+summary(fit9)
+fit10 <- glm(Survived~Pclass + Sex + Age + SibSp + Sex:SibSp, 
+            family = binomial, data = train)
+summary(fit10)
+
+```
+```{r}
+fit11 <- glm(Survived~Pclass + Sex + Age + SibSp + Pclass:Sex + Pclass:Age + Pclass:SibSp +
+            Sex:Age + Age:SibSp, 
+            family = binomial, data = train)
+summary(fit11)
+fit12 <- glm(Survived~Pclass + Sex + Age + SibSp + Pclass:Sex , 
+            family = binomial, data = train)
+summary(fit12)
+```
+```{r}
+#install.packages("caret")
+library(caret)
+
+predictions = predict(fit12, test[,-1], type="response")
+y_test = as.factor(c(test$Survived))
+
+roc_obj <- roc(y_test, predictions, levels = rev(levels(y_test)))
+plot(roc_obj, xlim = c(1,0))
+
+optimal_threshold <- coords(roc_obj, "best", ret = "threshold", best.method = "youden")
+print(paste("Optimal Threshold: ", optimal_threshold))
+```
+
+```{r,include=FALSE}
+
+predictions = ifelse(predictions >= optimal_threshold[[1]], 1, 0)
+```
+
+
+
+```{r, include=FALSE}
+
+
+y_pred = as.factor(c(predictions))
+
+cm = confusionMatrix(y_test, y_pred)
+sens = sensitivity(y_pred, y_test)
+spec = specificity(y_pred, y_test)
+ppv = posPredValue(y_pred, y_test)
+npv = negPredValue(y_pred, y_test)
+```
+
+```{r}
+print(cm)
+cat('sensitivity:', sens)
+cat('specificity:', spec)
+cat('PPV:', ppv)
+cat('NPV:', npv)
+
+```
+```{r}
+X_test <- read.csv('test_cleaned.csv')
+X_test$Sex[X_test$Sex == 'male'] <- 1
+X_test$Sex[X_test$Sex == 'female'] <- 0
+X_test$Embarked[X_test$Embarked == 'S'] <- 2
+X_test$Embarked[X_test$Embarked == 'C'] <- 1
+X_test$Embarked[X_test$Embarked == 'Q'] <- 0
+X_test <- X_test[,-1]
+y = predict(fit12, X_test, type="response")
+y = ifelse(y >= optimal_threshold[[1]], 1, 0)
+write.csv(y, file ='result by logit', row.names = FALSE)
+```
+
